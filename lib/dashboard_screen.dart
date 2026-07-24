@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import 'services/complaint_service.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
+import 'screens/resident_portal_tab.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -393,20 +394,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF060D1E),
         elevation: 0,
-        title: InkWell(
-          onTap: () => setState(() => _currentIndex = 0),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(color: const Color(0xFF0066FF), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(LucideIcons.shieldCheck, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 10),
-              const Text('CIVICCARE.AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
-            ],
-          ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: const Color(0xFF0066FF), borderRadius: BorderRadius.circular(8)),
+              child: const Icon(LucideIcons.shieldCheck, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 10),
+            const Text('CIVICCARE.AI', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 16)),
+          ],
         ),
         actions: [
           IconButton(
@@ -466,7 +463,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           )
         ],
       ),
-      // --- SLIDING DRAWER SIDEBAR (Matches Web Portal Sidebar) ---
+      // --- SLIDING DRAWER SIDEBAR ---
       drawer: Drawer(
         backgroundColor: const Color(0xFF060D1E),
         child: ListView(
@@ -520,8 +517,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onTap: () { setState(() => _currentIndex = 2); Navigator.pop(context); },
             ),
             ListTile(
-              leading: const Icon(LucideIcons.user, color: Colors.white70),
-              title: const Text('Digital Identity', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              leading: const Icon(LucideIcons.clipboardList, color: Colors.white70),
+              title: const Text('Resident Portal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               selected: _currentIndex == 3,
               onTap: () { setState(() => _currentIndex = 3); Navigator.pop(context); },
             ),
@@ -563,7 +560,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           BottomNavigationBarItem(icon: Icon(LucideIcons.layoutDashboard), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(LucideIcons.fileText), label: 'Complaints'),
           BottomNavigationBarItem(icon: Icon(LucideIcons.shieldAlert), label: 'SOS'),
-          BottomNavigationBarItem(icon: Icon(LucideIcons.user), label: 'Digital ID'),
+          BottomNavigationBarItem(icon: Icon(LucideIcons.clipboardList), label: 'Portal'),
         ],
       ),
     );
@@ -574,7 +571,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       case 0: return _buildHomeTab();
       case 1: return _buildComplaintsTab();
       case 2: return _buildSOSTab();
-      case 3: return _buildProfileTab();
+      case 3: return ResidentPortalTab(userData: userData, isLoadingProfile: _isLoadingProfile);
       default: return _buildHomeTab();
     }
   }
@@ -865,127 +862,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               Text('Line: $num', style: const TextStyle(color: Colors.grey, fontSize: 11)),
             ],
           )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProfileTab() {
-    if (_isLoadingProfile) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: [
-          Container(
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10)]),
-            child: Column(
-              children: [
-                Container(
-                  height: 120,
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(colors: [Color(0xFF0066FF), Color(0xFF06B6D4)]),
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                  ),
-                ),
-                Transform.translate(
-                  offset: const Offset(0, -40),
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: Colors.white,
-                        backgroundImage: userData?['profilePicture'] != null && userData!['profilePicture'].toString().isNotEmpty
-                            ? (userData!['profilePicture'].toString().startsWith('data:image')
-                            ? MemoryImage(base64Decode(userData!['profilePicture'].toString().split(',')[1]))
-                            : NetworkImage('http://127.0.0.1:5000${userData!['profilePicture']}') as ImageProvider)
-                            : NetworkImage('https://api.dicebear.com/7.x/avataaars/png?seed=${userData?['fullName'] ?? 'Citizen'}') as ImageProvider,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(userData?['fullName'] ?? 'Citizen Name', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
-                      Text(userData?['accountType'] ?? 'Citizen', style: const TextStyle(color: Color(0xFF0066FF), fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          _buildBentoCard(
-            title: 'Official Identity',
-            icon: Icons.person,
-            color: Colors.blue,
-            children: [
-              _buildInfoRow('CNIC Number', userData?['cnic'] ?? 'Not provided'),
-              _buildInfoRow('Father\'s Name', userData?['fatherName'] ?? 'Not provided'),
-              _buildInfoRow('Date of Birth', userData?['dob'] != null ? userData!['dob'].toString().split('T')[0] : 'Not provided'),
-              _buildInfoRow('Gender', userData?['gender'] ?? 'Not provided'),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          _buildBentoCard(
-            title: 'Contact Channels',
-            icon: Icons.phone_in_talk,
-            color: Colors.indigo,
-            children: [
-              _buildInfoRow('Primary Email', userData?['email'] ?? 'Not provided'),
-              _buildInfoRow('Mobile Network', userData?['phone'] ?? 'Not provided'),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          _buildBentoCard(
-            title: 'Registered Domicile',
-            icon: Icons.location_on,
-            color: Colors.teal,
-            children: [
-              _buildInfoRow('Province', userData?['province'] ?? 'Not provided'),
-              _buildInfoRow('District / City', userData?['district'] ?? userData?['city'] ?? 'Not provided'),
-              _buildInfoRow('Tehsil', userData?['tehsil'] ?? 'Not provided'),
-              _buildInfoRow('Complete Address', userData?['address'] ?? 'Not provided'),
-            ],
-          ),
-          const SizedBox(height: 25),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBentoCard({required String title, required IconData icon, required Color color, required List<Widget> children}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8)]),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color)),
-              const SizedBox(width: 12),
-              Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
-            ],
-          ),
-          const Divider(height: 24),
-          ...children,
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
-          const SizedBox(height: 2),
-          Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
         ],
       ),
     );
