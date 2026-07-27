@@ -5,10 +5,13 @@ import 'package:http/http.dart' as http;
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
-import 'services/complaint_service.dart';
+
+import '../services/complaint_service.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
 import 'screens/resident_portal_tab.dart';
+import 'screens/information_center_screen.dart';
+import 'screens/services_tab.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({Key? key}) : super(key: key);
@@ -18,6 +21,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
+  // Index Mapping: 0=Home, 1=Complaints, 2=Services, 3=Info, 4=SOS, 5=Portal
   int _currentIndex = 0;
   Map<String, dynamic>? userData;
   bool _isLoadingProfile = true;
@@ -46,7 +50,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final token = prefs.getString('token') ?? '';
 
     if (userId.isEmpty) {
-      setState(() => _isLoadingProfile = false);
+      if (mounted) setState(() => _isLoadingProfile = false);
       return;
     }
 
@@ -56,7 +60,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         headers: {'Authorization': 'Bearer $token'},
       );
 
-      if (res.statusCode == 200) {
+      if (res.statusCode == 200 && mounted) {
         final data = json.decode(res.body);
         setState(() {
           userData = {
@@ -70,31 +74,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
           };
           _isLoadingProfile = false;
         });
-      } else {
+      } else if (mounted) {
         setState(() => _isLoadingProfile = false);
       }
     } catch (e) {
       debugPrint("Error fetching profile: $e");
-      setState(() => _isLoadingProfile = false);
+      if (mounted) setState(() => _isLoadingProfile = false);
     }
   }
 
   Future<void> _fetchDashboardData() async {
-    setState(() => _isLoadingComplaints = true);
     try {
       final statsRes = await _complaintService.fetchDashboardStats();
       final complaintsRes = await _complaintService.fetchUserComplaints();
 
-      setState(() {
-        if (statsRes['success'] == true) {
-          _stats = statsRes['data']['stats'];
-        }
-        _complaints = complaintsRes;
-        _isLoadingComplaints = false;
-      });
+      if (mounted) {
+        setState(() {
+          if (statsRes['success'] == true) {
+            _stats = statsRes['data']['stats'];
+          }
+          _complaints = complaintsRes;
+          _isLoadingComplaints = false;
+        });
+      }
     } catch (e) {
       debugPrint("Dashboard data error: $e");
-      setState(() => _isLoadingComplaints = false);
+      if (mounted) setState(() => _isLoadingComplaints = false);
     }
   }
 
@@ -118,14 +123,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (confirm == true) {
       try {
         await _complaintService.deleteComplaint(id);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Ticket deleted successfully'), backgroundColor: Colors.green),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Ticket deleted successfully'), backgroundColor: Colors.green),
+          );
+        }
         _fetchDashboardData();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(e.toString()), backgroundColor: Colors.red),
+          );
+        }
       }
     }
   }
@@ -133,11 +142,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _handleLogout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.clear();
-    Navigator.pushAndRemoveUntil(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (Route<dynamic> route) => false,
-    );
+    if (mounted) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+            (Route<dynamic> route) => false,
+      );
+    }
   }
 
   void _showTicketDetailsModal(Map<String, dynamic> ticket) {
@@ -233,9 +244,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         builder: (ctx, setModalState) => Container(
           padding: EdgeInsets.only(
             bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 20,
-            right: 20,
-            top: 25,
+            left: 20, right: 20, top: 25,
           ),
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -363,11 +372,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           address: locationController.text,
                           imageUrl: base64Image,
                         );
-                        Navigator.pop(context);
-                        _fetchDashboardData();
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket submitted successfully!'), backgroundColor: Colors.green));
+                        if (mounted) {
+                          Navigator.pop(context);
+                          _fetchDashboardData();
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ticket submitted successfully!'), backgroundColor: Colors.green));
+                        }
                       } catch (e) {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
                       } finally {
                         setModalState(() => isSubmitting = false);
                       }
@@ -386,11 +397,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
+  Widget _buildCurrentTabContent() {
+    switch (_currentIndex) {
+      case 0: return _buildHomeTab();
+      case 1: return _buildComplaintsTab();
+      case 2: return const ServicesTab();
+      case 3: return InformationCenterScreen();
+      case 4: return _buildSOSTab();
+      case 5: return ResidentPortalTab(userData: userData, isLoadingProfile: _isLoadingProfile);
+      default: return _buildHomeTab();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FB),
-      // --- STICKY APPBAR ---
       appBar: AppBar(
         backgroundColor: const Color(0xFF060D1E),
         elevation: 0,
@@ -406,11 +428,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.bell, color: Colors.white),
-            onPressed: () {},
-          ),
-          // Facebook-style Profile Dropdown Menu
+          IconButton(icon: const Icon(LucideIcons.bell, color: Colors.white), onPressed: () {}),
           PopupMenuButton<String>(
             offset: const Offset(0, 50),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -437,7 +455,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             onSelected: (value) {
               if (value == 'profile') {
-                setState(() => _currentIndex = 3);
+                setState(() => _currentIndex = 5);
               } else if (value == 'settings') {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
               } else if (value == 'logout') {
@@ -463,7 +481,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           )
         ],
       ),
-      // --- SLIDING DRAWER SIDEBAR ---
       drawer: Drawer(
         backgroundColor: const Color(0xFF060D1E),
         child: ListView(
@@ -511,16 +528,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
               onTap: () { setState(() => _currentIndex = 1); Navigator.pop(context); },
             ),
             ListTile(
-              leading: const Icon(LucideIcons.shieldAlert, color: Colors.white70),
-              title: const Text('SOS Emergency', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              leading: const Icon(LucideIcons.briefcase, color: Colors.white70),
+              title: const Text('Citizen Services', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               selected: _currentIndex == 2,
               onTap: () { setState(() => _currentIndex = 2); Navigator.pop(context); },
             ),
             ListTile(
-              leading: const Icon(LucideIcons.clipboardList, color: Colors.white70),
-              title: const Text('Resident Portal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              leading: const Icon(LucideIcons.info, color: Colors.white70),
+              title: const Text('Info Center', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               selected: _currentIndex == 3,
               onTap: () { setState(() => _currentIndex = 3); Navigator.pop(context); },
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.shieldAlert, color: Colors.white70),
+              title: const Text('SOS Emergency', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              selected: _currentIndex == 4,
+              onTap: () { setState(() => _currentIndex = 4); Navigator.pop(context); },
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.clipboardList, color: Colors.white70),
+              title: const Text('Resident Portal', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              selected: _currentIndex == 5,
+              onTap: () { setState(() => _currentIndex = 5); Navigator.pop(context); },
             ),
             const Divider(color: Colors.white24, height: 30),
             const Padding(
@@ -549,31 +578,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ],
         ),
       ),
-      body: _buildCurrentTabContent(),
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          _buildHomeTab(),
+          _buildComplaintsTab(),
+          const ServicesTab(),
+          InformationCenterScreen(),
+          _buildSOSTab(),
+          ResidentPortalTab(userData: userData, isLoadingProfile: _isLoadingProfile),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (index) => setState(() => _currentIndex = index),
+        currentIndex: [0, 1, 2, 3, 5].contains(_currentIndex) ? [0, 1, 2, 3, 5].indexOf(_currentIndex) : 0,
+        onTap: (index) {
+          final mappedIndices = [0, 1, 2, 3, 5];
+          setState(() => _currentIndex = mappedIndices[index]);
+        },
         type: BottomNavigationBarType.fixed,
         selectedItemColor: const Color(0xFF0066FF),
         unselectedItemColor: Colors.grey,
+        selectedFontSize: 11,
+        unselectedFontSize: 11,
         items: const [
           BottomNavigationBarItem(icon: Icon(LucideIcons.layoutDashboard), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(LucideIcons.fileText), label: 'Complaints'),
-          BottomNavigationBarItem(icon: Icon(LucideIcons.shieldAlert), label: 'SOS'),
+          BottomNavigationBarItem(icon: Icon(LucideIcons.briefcase), label: 'Services'),
+          BottomNavigationBarItem(icon: Icon(LucideIcons.info), label: 'Info Hub'),
           BottomNavigationBarItem(icon: Icon(LucideIcons.clipboardList), label: 'Portal'),
         ],
       ),
     );
-  }
-
-  Widget _buildCurrentTabContent() {
-    switch (_currentIndex) {
-      case 0: return _buildHomeTab();
-      case 1: return _buildComplaintsTab();
-      case 2: return _buildSOSTab();
-      case 3: return ResidentPortalTab(userData: userData, isLoadingProfile: _isLoadingProfile);
-      default: return _buildHomeTab();
-    }
   }
 
   Widget _buildHomeTab() {

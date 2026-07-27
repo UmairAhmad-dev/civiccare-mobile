@@ -14,17 +14,19 @@ class ResidentPortalTab extends StatefulWidget {
   State<ResidentPortalTab> createState() => _ResidentPortalTabState();
 }
 
-class _ResidentPortalTabState extends State<ResidentPortalTab> {
+class _ResidentPortalTabState extends State<ResidentPortalTab> with AutomaticKeepAliveClientMixin {
   String _activeView = 'grid';
-  bool _isLoading = true;
+  bool _isLoading = false;
 
   List<dynamic> _family = [];
   List<dynamic> _vehicles = [];
   List<dynamic> _tenants = [];
   List<dynamic> _servants = [];
 
-  // Track the ID of the item currently being asked "Delete?" inline
   int? _deleteConfirmId;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -33,6 +35,7 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
   }
 
   void _showInlineMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -51,7 +54,10 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
   }
 
   Future<void> _fetchPortfolio() async {
-    setState(() => _isLoading = true);
+    if (_family.isEmpty && _vehicles.isEmpty && _tenants.isEmpty && _servants.isEmpty) {
+      setState(() => _isLoading = true);
+    }
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token') ?? '';
@@ -62,7 +68,7 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
       );
 
       final data = json.decode(res.body);
-      if (data['success'] == true) {
+      if (data['success'] == true && mounted) {
         setState(() {
           _family = data['data']['familyMembers'] ?? [];
           _vehicles = data['data']['vehicles'] ?? [];
@@ -73,7 +79,7 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
     } catch (e) {
       _showInlineMessage("Failed to load resident data", isError: true);
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -88,15 +94,15 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
       final data = json.decode(res.body);
       if (data['success']) {
         _showInlineMessage("Record deleted successfully");
-        setState(() => _deleteConfirmId = null);
+        if (mounted) setState(() => _deleteConfirmId = null);
         _fetchPortfolio();
       } else {
         _showInlineMessage(data['message'] ?? "Deletion failed", isError: true);
-        setState(() => _deleteConfirmId = null);
+        if (mounted) setState(() => _deleteConfirmId = null);
       }
     } catch (e) {
       _showInlineMessage("Network error", isError: true);
-      setState(() => _deleteConfirmId = null);
+      if (mounted) setState(() => _deleteConfirmId = null);
     }
   }
 
@@ -158,7 +164,7 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0066FF), // FIXED TO PRIMARY BLUE
+                      backgroundColor: const Color(0xFF0066FF),
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                     ),
@@ -181,7 +187,7 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
 
                         final data = json.decode(response.body);
 
-                        if (data['success']) {
+                        if (data['success'] && mounted) {
                           Navigator.pop(context);
                           _showInlineMessage("$title ${isUpdating ? 'updated' : 'added'} successfully!");
                           _fetchPortfolio();
@@ -331,7 +337,6 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
                         ],
                       ),
                     ),
-                    // --- INLINE DELETE CONFIRMATION IMPLEMENTED IN FLUTTER ---
                     if (isConfirmingDelete)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -409,6 +414,7 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for KeepAlive
     if (_activeView == 'profile') return _buildProfileTab();
 
     if (_activeView == 'family') return _buildListModule('family', 'Family', _family, LucideIcons.users, Colors.pink, [
@@ -438,7 +444,6 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
       {'name': 'contact', 'label': 'Contact Number', 'placeholder': '03XX-XXXXXXX'},
     ]);
 
-    // DEFAULT GRID VIEW
     final List<Map<String, dynamic>> modules = [
       {'id': 'profile', 'title': 'My Profile', 'desc': 'View primary records', 'icon': LucideIcons.fileBadge, 'color': Colors.blue},
       {'id': 'family', 'title': 'Family Registry', 'desc': 'Add household members', 'icon': LucideIcons.users, 'color': Colors.pink},
@@ -447,64 +452,66 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> {
       {'id': 'servants', 'title': 'Staff Clearances', 'desc': 'Verify maids & drivers', 'icon': LucideIcons.userCheck, 'color': Colors.purple},
     ];
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(32),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(16)),
-                  child: const Icon(LucideIcons.clipboardList, size: 28, color: Color(0xFF0066FF)),
-                ),
-                const SizedBox(width: 16),
-                const Text('Resident Data', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF060D1E))),
-              ],
-            ),
-            const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Divider(height: 1)),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              // ADJUSTED HERE: Changed childAspectRatio to 1.3 to prevent text overflow[cite: 17]
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, childAspectRatio: 1.3, crossAxisSpacing: 16, mainAxisSpacing: 16,
-              ),
-              itemCount: modules.length,
-              itemBuilder: (context, index) {
-                final mod = modules[index];
-                return InkWell(
-                  onTap: () => setState(() { _activeView = mod['id']; _deleteConfirmId = null; }),
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
+    return RefreshIndicator(
+      onRefresh: _fetchPortfolio,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(20),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white, borderRadius: BorderRadius.circular(32),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 15, offset: const Offset(0, 5))],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(16)),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(mod['icon'], color: (mod['color'] as MaterialColor).shade600, size: 28),
-                        const SizedBox(height: 8),
-                        Text(mod['title'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
-                        // Ensure descriptions do not exceed allocated space[cite: 17]
-                        Flexible(
-                          child: Text(mod['desc'], style: const TextStyle(color: Colors.grey, fontSize: 9, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ),
-                      ],
-                    ),
+                    decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(16)),
+                    child: const Icon(LucideIcons.clipboardList, size: 28, color: Color(0xFF0066FF)),
                   ),
-                );
-              },
-            ),
-          ],
+                  const SizedBox(width: 16),
+                  const Text('Resident Data', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF060D1E))),
+                ],
+              ),
+              const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Divider(height: 1)),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2, childAspectRatio: 1.3, crossAxisSpacing: 16, mainAxisSpacing: 16,
+                ),
+                itemCount: modules.length,
+                itemBuilder: (context, index) {
+                  final mod = modules[index];
+                  return InkWell(
+                    onTap: () => setState(() { _activeView = mod['id']; _deleteConfirmId = null; }),
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade200), borderRadius: BorderRadius.circular(16)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(mod['icon'], color: (mod['color'] as MaterialColor).shade600, size: 28),
+                          const SizedBox(height: 8),
+                          Text(mod['title'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87)),
+                          Flexible(
+                            child: Text(mod['desc'], style: const TextStyle(color: Colors.grey, fontSize: 9, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
