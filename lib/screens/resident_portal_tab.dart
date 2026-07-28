@@ -189,7 +189,7 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> with AutomaticKee
 
                         if (data['success'] && mounted) {
                           Navigator.pop(context);
-                          _showInlineMessage("$title ${isUpdating ? 'updated' : 'added'} successfully!");
+                          _showInlineMessage("$title submitted for Admin Approval!"); // UPDATED
                           _fetchPortfolio();
                         } else {
                           _showInlineMessage(data['message'], isError: true);
@@ -211,6 +211,45 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> with AutomaticKee
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  // --- NEW: Helper to Render the Exact Status visually on Flutter ---
+  Widget _buildStatusTag(String? status) {
+    final currentStatus = status ?? 'Pending';
+    Color bgColor;
+    Color textColor;
+    IconData icon;
+
+    if (currentStatus == 'Approved') {
+      bgColor = Colors.teal.shade50;
+      textColor = Colors.teal.shade700;
+      icon = LucideIcons.checkCircle2;
+    } else if (currentStatus == 'Rejected') {
+      bgColor = Colors.red.shade50;
+      textColor = Colors.red.shade700;
+      icon = LucideIcons.xCircle;
+    } else {
+      bgColor = Colors.orange.shade50;
+      textColor = Colors.orange.shade700;
+      icon = LucideIcons.clock;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: textColor.withOpacity(0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: textColor),
+          const SizedBox(width: 4),
+          Text(currentStatus.toUpperCase(), style: TextStyle(color: textColor, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+        ],
       ),
     );
   }
@@ -292,6 +331,34 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> with AutomaticKee
             ],
           ),
         ),
+
+        // NEW: Inline Security Policy for Flutter Lists
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.blue.shade100)),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(LucideIcons.shieldAlert, color: Colors.blue.shade700, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text("Security Policy", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.blue.shade900)),
+                      const SizedBox(height: 4),
+                      Text("Submitted $title must be reviewed by the admin before officially becoming active.", style: TextStyle(fontSize: 12, color: Colors.blue.shade800, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
         Expanded(
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
@@ -318,13 +385,19 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> with AutomaticKee
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.grey.shade200)),
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(item['fullName'] ?? "${item['make']} ${item['model']}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Expanded(child: Text(item['fullName'] ?? "${item['make']} ${item['model']}", style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16))),
+                              _buildStatusTag(item['status']), // RENDERING STATUS BADGE
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           Wrap(
                             spacing: 8, runSpacing: 8,
                             children: [
@@ -337,6 +410,7 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> with AutomaticKee
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
                     if (isConfirmingDelete)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -344,7 +418,7 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> with AutomaticKee
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Text("Delete?", style: TextStyle(color: Colors.red, fontWeight: FontWeight.w900, fontSize: 10)),
+                            const Text("Del?", style: TextStyle(color: Colors.red, fontWeight: FontWeight.w900, fontSize: 10)),
                             const SizedBox(width: 8),
                             InkWell(
                               onTap: () => _executeDelete(apiCategory, item['id']),
@@ -467,6 +541,31 @@ class _ResidentPortalTabState extends State<ResidentPortalTab> with AutomaticKee
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+
+              // NEW: Global Security Banner for Grid View
+              Container(
+                padding: const EdgeInsets.all(16),
+                margin: const EdgeInsets.only(bottom: 24),
+                decoration: BoxDecoration(color: Colors.blue.shade50, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.blue.shade100)),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(LucideIcons.shieldAlert, color: Colors.blue.shade700, size: 24),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Security Policy", style: TextStyle(fontWeight: FontWeight.w900, color: Colors.blue.shade900)),
+                          const SizedBox(height: 4),
+                          Text("All newly registered data is subject to administrative review before being marked as active.", style: TextStyle(fontSize: 12, color: Colors.blue.shade800, fontWeight: FontWeight.w500)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
               Row(
                 children: [
                   Container(
